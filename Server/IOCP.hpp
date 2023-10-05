@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <vector>
+#include <thread>
 
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
@@ -13,6 +14,8 @@
 
 namespace IOCP
 {
+	class IOCPThreadInfo;
+
 	class IOCP
 	{
 	public:
@@ -24,7 +27,7 @@ namespace IOCP
 		UniqueWSAEvent m_hAcceptEvent;
 		UniqueHandle m_hShutdownEvent;
 		UniqueHandle m_hIOCP;
-		std::vector<UniqueHandle> m_vThreads;
+		std::vector<std::thread> m_vThreads;
 
 		IOCPContextManager m_contextManager;
 
@@ -36,12 +39,6 @@ namespace IOCP
 		void operator=(IOCP&&) = delete;
 
 		/// <summary>
-		/// Initialize the IOCP class.
-		/// </summary>
-		/// <returns></returns>
-		bool Init();
-
-		/// <summary>
 		/// Begin accepting clients.
 		/// </summary>
 		/// <param name="usPort"></param>
@@ -51,8 +48,9 @@ namespace IOCP
 	protected:
 		bool ScheduleAccept();
 		bool AcceptConnection(SOCKET clientListenSock);
-		static DWORD WINAPI WorkerThread(PVOID _pThreadInfo);
 		bool AssociateWithIOCP(const IOCPContext* pContext);
+	public:
+		bool WorkerThread(IOCPThreadInfo&& threadInfo);
 	};
 
 	class IOCPThreadInfo

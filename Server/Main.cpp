@@ -14,11 +14,6 @@ int main(int argc, char** argv)
 	}
 
 	IOCP::IOCP iocp;
-	if (!iocp.Init())
-	{
-		DEBUG_PRINT("iocp.Init() WSA_GLE: %d\n", WSAGetLastError());
-		return -1;
-	}
 
 	u_short usPort = atoi(argv[1]);
 	if (!iocp.Begin(usPort))

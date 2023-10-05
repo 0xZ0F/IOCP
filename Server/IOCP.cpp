@@ -1,3 +1,5 @@
+#include <functional>
+
 #include "IOCP.hpp"
 #include "WSAOVERLAPPEDPLUS.h"
 
@@ -11,7 +13,7 @@ IOCP::IOCP::IOCP() :
 	m_hAcceptEvent(UniqueWSAEvent(NULL, WSACloseEvent))
 {}
 
-bool IOCP::IOCP::Init()
+bool IOCP::IOCP::Begin(u_short usPort)
 {
 	// Initialize Winsock
 	WSADATA wsaData = { 0 };
@@ -34,35 +36,18 @@ bool IOCP::IOCP::Init()
 		return false;
 	}
 
-	//Create worker threads
+	//Create 3 worker threads to start
 	DWORD dwThreadID;
-	for (int x = 0; x < m_vThreads.size(); x++)
+	for (int x = 0; x < 3; x++)
 	{
-		IOCPThreadInfo* threadInfo = new IOCPThreadInfo(this, IntToPtr(x + 1));
-		UniqueHandle hNewThread = UniqueHandle(
-			CreateThread(
-				0,
-				0,
-				WorkerThread,
-				threadInfo,
-				0,
-				&dwThreadID),
-			CloseHandle
-		);
+		IOCPThreadInfo threadInfo;
+		threadInfo.pIOCP = std::shared_ptr<IOCP>(this);
+		threadInfo.pParam = IntToPtr(x + 1);
 
-		if (!hNewThread)
-		{
-			return false;
-		}
-
-		m_vThreads.push_back(std::move(hNewThread));
+		std::thread newThread(&IOCP::WorkerThread, this, std::move(threadInfo));
+		m_vThreads.push_back(std::move(newThread));
 	}
 
-	return true;
-}
-
-bool IOCP::IOCP::Begin(u_short usPort)
-{
 	if (!m_hListenSocket.CreateSocketW(
 		AF_INET,
 		SOCK_STREAM,
@@ -74,7 +59,7 @@ bool IOCP::IOCP::Begin(u_short usPort)
 		return false;
 	}
 
-	auto pListenContext = std::shared_ptr<IOCPContext>();
+	std::shared_ptr<IOCPContext> pListenContext = std::make_shared<IOCPContext>();
 	pListenContext->SetSocket(m_hListenSocket.GetCopy());
 	pListenContext->SetOpCode(IOCPContext::OP_LISTEN);
 	m_contextManager.AddContext(pListenContext);
@@ -186,21 +171,28 @@ bool IOCP::IOCP::AcceptConnection(SOCKET clientListenSock)
 	return true;
 }
 
-DWORD IOCP::IOCP::WorkerThread(PVOID _pThreadInfo)
+bool IOCP::IOCP::AssociateWithIOCP(const IOCPContext* pContext)
 {
-	if (NULL == _pThreadInfo)
-	{
-		fprintf(stderr, "WorkterThread() NULL PTR\n");
-		return 0;
-	}
+	SOCKET sock = pContext->GetSocketCopy();
 
-	IOCPThreadInfo* pThreadInfo = (IOCPThreadInfo*)_pThreadInfo;
-	auto pHandler = (std::shared_ptr<IOCP>)pThreadInfo->pIOCP;
+	// Associate the socket with IOCP
+	HANDLE hTemp = CreateIoCompletionPort((HANDLE)sock, m_hIOCP.get(), (ULONG_PTR)pContext, 0);
+	if (NULL == hTemp)
+	{
+		// TODO: Remove Context
+		return false;
+	}
+	return true;
+}
+
+bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
+{
+	auto pHandler = (std::shared_ptr<IOCP>)threadInfo.pIOCP;
 
 	INT nBytesSent = 0;
 	DWORD dwBytes = 0;
 	DWORD dwBytesTransfered = 0;
-	UINT_PTR nThreadNo = PtrToLong(pThreadInfo->pParam);
+	UINT_PTR nThreadNo = PtrToLong(threadInfo.pParam);
 	OVERLAPPED* pOverlapped = NULL;
 	IOCPContext* pContext = NULL;
 
@@ -226,11 +218,11 @@ DWORD IOCP::IOCP::WorkerThread(PVOID _pThreadInfo)
 			if ((FALSE == bReturn) || ((TRUE == bReturn) && (0 == dwBytesTransfered)))
 			{
 				// Client disconnected
-				
+
 				// TODO:
 				/*pHandler->WriteToConsole(stderr, "Client Disconnected.\n");
 				pHandler->RemoveFromClientListAndFreeMemory(pContext);*/
-				
+
 				continue;
 			}
 		}
@@ -314,19 +306,6 @@ DWORD IOCP::IOCP::WorkerThread(PVOID _pThreadInfo)
 			break;
 		}
 	}
-	return 0;
-}
 
-bool IOCP::IOCP::AssociateWithIOCP(const IOCPContext* pContext)
-{
-	SOCKET sock = pContext->GetSocketCopy();
-
-	// Associate the socket with IOCP
-	HANDLE hTemp = CreateIoCompletionPort((HANDLE)sock, m_hIOCP.get(), (ULONG_PTR)pContext, 0);
-	if (NULL == hTemp)
-	{
-		// TODO: Remove Context
-		return false;
-	}
 	return true;
 }

@@ -130,11 +130,11 @@ BOOL IOCP::IOCPContext::GetBuffer(char* szBuffer, size_t len) const
 {
 	if (NULL == szBuffer || len < 1 || len > sizeof(m_wsaBuf.len))
 	{
-		return FALSE;
+		return false;
 	}
 
 	memcpy_s(szBuffer, len, m_wsaBuf.buf, sizeof(m_wsaBuf.len));
-	return TRUE;
+	return true;
 }
 
 /// <summary>
