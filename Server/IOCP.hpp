@@ -43,13 +43,13 @@ namespace IOCP
 		/// </summary>
 		/// <param name="usPort"></param>
 		/// <returns></returns>
-		bool Begin(u_short usPort);
+		bool Begin(unsigned short usPort);
 
 	protected:
+		bool SetupListeningSocket(unsigned short usPort);
 		bool ScheduleAccept();
 		bool AcceptConnection(SOCKET clientListenSock);
 		bool AssociateWithIOCP(const IOCPContext* pContext);
-	public:
 		bool WorkerThread(IOCPThreadInfo&& threadInfo);
 	};
 
