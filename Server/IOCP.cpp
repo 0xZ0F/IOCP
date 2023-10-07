@@ -1,3 +1,5 @@
+#include "DebugPrint.h"
+
 #include <functional>
 
 #include "IOCP.hpp"
@@ -37,7 +39,6 @@ bool IOCP::IOCP::Begin(unsigned short usPort)
 	}
 
 	//Create 3 worker threads to start
-	DWORD dwThreadID;
 	for (int x = 0; x < 3; x++)
 	{
 		IOCPThreadInfo threadInfo;
@@ -202,16 +203,16 @@ bool IOCP::IOCP::AssociateWithIOCP(const IOCPContext* pContext)
 
 bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 {
+	DEBUG_PRINT("Thread %d Created\n", GetCurrentThreadId());
 	INT nBytesSent = 0;
 	DWORD dwBytes = 0;
 	DWORD dwBytesTransfered = 0;
 	UINT_PTR nThreadNo = PtrToLong(threadInfo.pParam);
 	OVERLAPPED* pOverlapped = NULL;
 	IOCPContext* pContext = NULL;
-
+	WSAOVERLAPPEDPLUS* pOverlappedPlus = NULL;
 	SOCKET targetSock = INVALID_SOCKET;
 
-	// While not shutting down...
 	while (WAIT_OBJECT_0 != WaitForSingleObject(m_hShutdownEvent.get(), 0))
 	{
 		BOOL bReturn = GetQueuedCompletionStatus(
@@ -234,13 +235,8 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 			if ((FALSE == bReturn) || ((TRUE == bReturn) && (0 == dwBytesTransfered)))
 			{
 				// Client disconnected
-
-				// TODO:
-				/*WriteToConsole(stderr, "Client Disconnected.\n");
-				RemoveFromClientListAndFreeMemory(pContext);*/
-				
+				DEBUG_PRINT("Client Disconnected\n");
 				m_contextManager.RemoveContext(pContext);
-
 				continue;
 			}
 		}
@@ -256,40 +252,50 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 
 		case IOCPContext::OP_LISTEN:
 			// New connection
-			WSAOVERLAPPEDPLUS* pOverlappedPlus = CONTAINING_RECORD(pOverlapped, WSAOVERLAPPEDPLUS, wsaOverlapped);
+			DEBUG_PRINT("New Connection\n");
+			pOverlappedPlus = CONTAINING_RECORD(pOverlapped, WSAOVERLAPPEDPLUS, wsaOverlapped);
 
 			// Copy listening socket properties onto connected client socket. See MSDN.
-			if (setsockopt(
-				pContext->GetSocketCopy(),
-				SOL_SOCKET,
-				SO_UPDATE_ACCEPT_CONTEXT,
-				(char*)&m_hListenSocket,
-				sizeof(m_hListenSocket)))
-			{
-				// Remove Client
-				// Remove Client
-				// Remove Client
-				// Remove Client
-				// Remove Client
+			//if (setsockopt(
+			//	pContext->GetSocketCopy(),
+			//	SOL_SOCKET,
+			//	SO_UPDATE_ACCEPT_CONTEXT,
+			//	(char*)&m_hListenSocket,
+			//	sizeof(m_hListenSocket)))
+			//{
+			//	DEBUG_PRINT("setsockopt() %d\n", WSAGetLastError());
+			//	
+			//	// Remove Client
+			//	// Remove Client
+			//	// Remove Client
+			//	// Remove Client
+			//	// Remove Client
 
-				if (!FreeWSAOverlappedPlus(&pOverlappedPlus))
-				{
-					//
-				}
-			}
+			//	if (!FreeWSAOverlappedPlus(&pOverlappedPlus))
+			//	{
+			//		DEBUG_PRINT("FreeWSAOverlappedPlus()\n");
+			//	}
+
+			//	continue;
+			//}
 			
 			// Register new client
-			HandleNewConnection(pOverlappedPlus->hClientSocket);
+			if (!HandleNewConnection(pOverlappedPlus->hClientSocket))
+			{
+				DEBUG_PRINT("HandleNewConnection()\n");
+				break;
+			}
 			
 			if (!FreeWSAOverlappedPlus(&pOverlappedPlus))
 			{
-				//
+				DEBUG_PRINT("FreeWSAOverlappedPlus()\n");
 			}
 
 			break;
 
 		case IOCPContext::OP_READ:
 			// Client is reading, server is writing
+			DEBUG_PRINT("Read %d bytes.\n", dwBytesTransfered);
 			pContext->IncSentBytes(dwBytesTransfered);
 
 			// If not all data has been sent
@@ -304,7 +310,8 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 
 				if ((SOCKET_ERROR == nBytesSent) && (WSA_IO_PENDING != WSAGetLastError()))
 				{
-					RemoveFromClientListAndFreeMemory(pContext);
+					DEBUG_PRINT("WSASend() %d\n", WSAGetLastError());
+					m_contextManager.RemoveContext(pContext);
 				}*/
 			}
 			// All data sent, post recv
@@ -313,8 +320,8 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 				// Free WSABuf here
 				if (!pContext->ScheduleRecv())
 				{
-					/*WriteToConsole(stderr, "Thread %d: WSARecv() %d\n", nThreadNo, WSAGetLastError());
-					RemoveFromClientListAndFreeMemory(pContext);*/
+					DEBUG_PRINT("pContext->ScheduleRecv()() %d\n", WSAGetLastError());
+					m_contextManager.RemoveContext(pContext);
 				}
 				pContext->SetOpCode(IOCPContext::OP_WRITE);
 			}
@@ -323,12 +330,13 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 
 		case IOCPContext::OP_WRITE:
 			// Client is writing, server is reading, send response (echo)
+			DEBUG_PRINT("Client writing.\n");
 			char szBuffer[MAX_BUFFER_LEN];
 
 			// Recving data is handled by accept thread
 			if (!pContext->GetBuffer(szBuffer, sizeof(szBuffer)))
 			{
-				//WriteToConsole(stderr, "CClientContext->GetBuffer()\n");
+				DEBUG_PRINT("CClientContext->GetBuffer()\n");
 				break;
 			}
 
@@ -346,16 +354,18 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 
 			if ((SOCKET_ERROR == nBytesSent) && (WSA_IO_PENDING != WSAGetLastError()))
 			{
-				//WriteToConsole(stderr, "Thread %d: WSASend() %d\n", nThreadNo, WSAGetLastError());
-				//RemoveFromClientListAndFreeMemory(pContext);
+				DEBUG_PRINT("WSASend() %d\n", WSAGetLastError());
+				m_contextManager.RemoveContext(pContext);
 			}
 
 			break;
 
 		default:
-			//WriteToConsole(stderr, "Unhandled OP code.\n");
+			DEBUG_PRINT("Invaild Opcode\n");
 			break;
 		}
+		
+		DEBUG_PRINT("Thread exiting.\n");
 	}
 
 	return true;

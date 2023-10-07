@@ -47,8 +47,8 @@ bool IOCP::IOCPContextManager::RemoveContext(IOCPContext* pContext)
 	EnterCriticalSection(&m_cs);
 
 	auto found = std::find_if(m_vContexts.begin(), m_vContexts.end(),
-		[&pContext](const std::shared_ptr<IOCPContext> pToFind) {
-			pToFind.get() == pContext;
+		[&pContext](const std::shared_ptr<IOCPContext> pToFind) -> bool {
+			return pToFind.get() == pContext;
 		}
 	);
 

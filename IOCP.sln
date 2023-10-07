@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Server", "Server\Server.vcx
 EndProject
 Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "Client", "Client\Client.pyproj", "{51BD0363-B183-4ED5-B6F1-74C3394BBEFC}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Logger", "Logger\Logger.vcxproj", "{890A00D6-CDFA-4968-B580-507897485CEC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,6 +37,18 @@ Global
 		{51BD0363-B183-4ED5-B6F1-74C3394BBEFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{51BD0363-B183-4ED5-B6F1-74C3394BBEFC}.Release|x64.ActiveCfg = Release|Any CPU
 		{51BD0363-B183-4ED5-B6F1-74C3394BBEFC}.Release|x86.ActiveCfg = Release|Any CPU
+		{890A00D6-CDFA-4968-B580-507897485CEC}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{890A00D6-CDFA-4968-B580-507897485CEC}.Debug|Any CPU.Build.0 = Debug|x64
+		{890A00D6-CDFA-4968-B580-507897485CEC}.Debug|x64.ActiveCfg = Debug|x64
+		{890A00D6-CDFA-4968-B580-507897485CEC}.Debug|x64.Build.0 = Debug|x64
+		{890A00D6-CDFA-4968-B580-507897485CEC}.Debug|x86.ActiveCfg = Debug|Win32
+		{890A00D6-CDFA-4968-B580-507897485CEC}.Debug|x86.Build.0 = Debug|Win32
+		{890A00D6-CDFA-4968-B580-507897485CEC}.Release|Any CPU.ActiveCfg = Release|x64
+		{890A00D6-CDFA-4968-B580-507897485CEC}.Release|Any CPU.Build.0 = Release|x64
+		{890A00D6-CDFA-4968-B580-507897485CEC}.Release|x64.ActiveCfg = Release|x64
+		{890A00D6-CDFA-4968-B580-507897485CEC}.Release|x64.Build.0 = Release|x64
+		{890A00D6-CDFA-4968-B580-507897485CEC}.Release|x86.ActiveCfg = Release|Win32
+		{890A00D6-CDFA-4968-B580-507897485CEC}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -3,6 +3,10 @@
 #include "DebugPrint.h"
 #include "IOCP.hpp"
 
+#ifndef NDEBUG
+Logger::Logger _g_logger;
+#endif
+
 int main(int argc, char** argv)
 {
 	DEBUG_PRINT("Debug On\n");
@@ -22,7 +26,6 @@ int main(int argc, char** argv)
 		return -1;
 	}
 
-	printf("...\n");
 	std::getchar();
 
 	return 0;
