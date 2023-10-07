@@ -47,12 +47,12 @@ namespace IOCP
 
 		int GetSentBytes() const;
 		void SetSentBytes(int n);
-		void IncrSentBytes(int n);
+		void IncSentBytes(int n);
 
 		void SetSocket(SOCKET sock);
 		SOCKET GetSocketCopy() const;
 
-		OVERLAPPED* GetOVERLAPPEDPtr() const;
+		OVERLAPPED* GetOverlapped() const;
 
 		bool ScheduleSend();
 

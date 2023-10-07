@@ -46,9 +46,9 @@ namespace IOCP
 		bool Begin(unsigned short usPort);
 
 	protected:
-		bool SetupListeningSocket(unsigned short usPort);
+		bool CreateListeningSocket(unsigned short usPort);
 		bool ScheduleAccept();
-		bool AcceptConnection(SOCKET clientListenSock);
+		bool HandleNewConnection(SOCKET clientListenSock);
 		bool AssociateWithIOCP(const IOCPContext* pContext);
 		bool WorkerThread(IOCPThreadInfo&& threadInfo);
 	};
@@ -56,11 +56,10 @@ namespace IOCP
 	class IOCPThreadInfo
 	{
 	public:
-		std::shared_ptr<IOCP> pIOCP;
 		LPVOID pParam;
 
 		IOCPThreadInfo(IOCP* iocp = NULL, LPVOID param = NULL) :
-			pIOCP(iocp), pParam(param)
+			pParam(param)
 		{}
 	};
 }

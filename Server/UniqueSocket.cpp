@@ -36,7 +36,7 @@ bool IOCP::UniqueSocket::CreateSocketW(
 	return true;
 }
 
-SOCKET IOCP::UniqueSocket::GetCopy() const
+SOCKET IOCP::UniqueSocket::GetSocket() const
 {
 	return m_hSocket;
 }

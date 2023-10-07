@@ -35,7 +35,7 @@ namespace IOCP
 		/// Get a copy of the socket handle.
 		/// </summary>
 		/// <returns>Returns a socket handle.</returns>
-		SOCKET GetCopy() const;
+		SOCKET GetSocket() const;
 
 		void SetSocket(SOCKET sock);
 	};

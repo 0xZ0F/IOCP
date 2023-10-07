@@ -45,7 +45,7 @@ void IOCP::IOCPContext::SetSentBytes(int n)
 	m_nSentBytes = n;
 }
 
-void IOCP::IOCPContext::IncrSentBytes(int n)
+void IOCP::IOCPContext::IncSentBytes(int n)
 {
 	m_nSentBytes += n;
 }
@@ -57,7 +57,7 @@ void IOCP::IOCPContext::SetSocket(SOCKET sock)
 
 SOCKET IOCP::IOCPContext::GetSocketCopy() const
 {
-	return m_hClientSocket.GetCopy();
+	return m_hClientSocket.GetSocket();
 }
 
 int IOCP::IOCPContext::GetSentBytes() const
@@ -65,7 +65,7 @@ int IOCP::IOCPContext::GetSentBytes() const
 	return m_nSentBytes;
 }
 
-OVERLAPPED* IOCP::IOCPContext::GetOVERLAPPEDPtr() const
+OVERLAPPED* IOCP::IOCPContext::GetOverlapped() const
 {
 	return m_pOverlapped;
 }
@@ -74,7 +74,7 @@ bool IOCP::IOCPContext::ScheduleSend()
 {
 	DWORD dwRet = 0;
 	DWORD dwSent = 0;
-	dwRet = WSASend(m_hClientSocket.GetCopy(), &m_wsaBuf, 1, &dwSent, 0, m_pOverlapped, NULL);
+	dwRet = WSASend(m_hClientSocket.GetSocket(), &m_wsaBuf, 1, &dwSent, 0, m_pOverlapped, NULL);
 
 	if ((SOCKET_ERROR == dwRet) && (WSA_IO_PENDING != WSAGetLastError()))
 	{
