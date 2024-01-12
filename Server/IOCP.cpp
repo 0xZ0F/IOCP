@@ -12,7 +12,9 @@
 IOCP::IOCP::IOCP() :
 	m_hIOCP(UniqueHandle(NULL, CloseHandle)),
 	m_hShutdownEvent(UniqueHandle(NULL, CloseHandle)),
-	m_hAcceptEvent(UniqueWSAEvent(NULL, WSACloseEvent))
+	m_hAcceptEvent(UniqueWSAEvent(NULL, WSACloseEvent)),
+	m_MoreDataCb(std::bind(&IOCP::DefaultMoreDataCb, this, std::placeholders::_1, std::placeholders::_2)),
+	m_ProcessPacketCb(std::bind(&IOCP::DefaultProcessPacketCb, this, std::placeholders::_1))
 {}
 
 bool IOCP::IOCP::Begin(unsigned short usPort)
@@ -57,6 +59,55 @@ bool IOCP::IOCP::Begin(unsigned short usPort)
 	{
 		return false;
 	}
+
+	return true;
+}
+
+bool IOCP::IOCP::DefaultMoreDataCb(const std::string_view& recvd, size_t& amountLeft)
+{
+	if (0 != recvd.back())
+	{
+		amountLeft = 1;
+	}
+
+	return 0 == amountLeft;
+}
+
+bool IOCP::IOCP::DefaultProcessPacketCb(IOCPContext& context)
+{
+	std::string packet{};
+	context.GetBufferContents(packet);
+
+	unsigned char* buf = (unsigned char*)packet.c_str();
+	int i, j;
+	for (i = 0; i < packet.length(); i += 16)
+	{
+		printf("%06x: ", i);
+		for (j = 0; j < 16; j++)
+		{
+			if (i + j < packet.length())
+			{
+				printf("%02x ", buf[i + j]);
+			}
+			else
+			{
+				printf("   ");
+			}
+		}
+
+		printf(" ");
+		for (j = 0; j < 16; j++)
+		{
+			if (i + j < packet.length())
+			{
+				printf("%c", isprint(buf[i + j]) ? buf[i + j] : '.');
+			}
+		}
+		printf("\n");
+	}
+
+	context.SetTotalSentBytes(context.RecvdBytesTotal);
+	context.ScheduleSend();
 
 	return true;
 }
@@ -169,18 +220,22 @@ bool IOCP::IOCP::HandleNewConnection(SOCKET clientListenSock)
 
 	if (FALSE == AssociateWithIOCP(pContext.get()))
 	{
-		/*WriteToConsole(stderr, "AssociateWithIOCP()\n");
-		RemoveFromClientListAndFreeMemory(pContext);*/
+		DEBUG_PRINT("AssociateWithIOCP()\n");
+		m_contextManager.RemoveContext(pContext);
 		return false;
 	}
 
 	if (!pContext->ScheduleRecv())
 	{
+		DEBUG_PRINT("ScheduleRecv()\n");
+		m_contextManager.RemoveContext(pContext);
 		return false;
 	}
 
 	if (!ScheduleAccept())
 	{
+		DEBUG_PRINT("ScheduleAccept()\n");
+		m_contextManager.RemoveContext(pContext);
 		return false;
 	}
 
@@ -203,7 +258,7 @@ bool IOCP::IOCP::AssociateWithIOCP(const IOCPContext* pContext)
 
 bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 {
-	DEBUG_PRINT("Thread %d Created\n", GetCurrentThreadId());
+	DEBUG_PRINT("Thread %d Started\n", GetCurrentThreadId());
 	INT nBytesSent = 0;
 	DWORD dwBytes = 0;
 	DWORD dwBytesTransfered = 0;
@@ -222,6 +277,10 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 			&pOverlapped,
 			INFINITE
 		);
+
+		///
+		/// TODO: Better GetQueuedCompletionStatus() checks
+		///
 
 		// This catches errors and the destructor
 		if (NULL == pContext)
@@ -244,7 +303,8 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 		int nBytesRecv = 0;
 		DWORD dwFlags = 0;
 		WSAOVERLAPPED* p_ol = pContext->GetOverlapped();
-
+		std::string data;
+		size_t dataLeft;
 		switch (pContext->GetOpCode())
 		{
 		case IOCPContext::OP_ACCEPT:
@@ -255,37 +315,13 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 			DEBUG_PRINT("New Connection\n");
 			pOverlappedPlus = CONTAINING_RECORD(pOverlapped, WSAOVERLAPPEDPLUS, wsaOverlapped);
 
-			// Copy listening socket properties onto connected client socket. See MSDN.
-			//if (setsockopt(
-			//	pContext->GetSocketCopy(),
-			//	SOL_SOCKET,
-			//	SO_UPDATE_ACCEPT_CONTEXT,
-			//	(char*)&m_hListenSocket,
-			//	sizeof(m_hListenSocket)))
-			//{
-			//	DEBUG_PRINT("setsockopt() %d\n", WSAGetLastError());
-			//	
-			//	// Remove Client
-			//	// Remove Client
-			//	// Remove Client
-			//	// Remove Client
-			//	// Remove Client
-
-			//	if (!FreeWSAOverlappedPlus(&pOverlappedPlus))
-			//	{
-			//		DEBUG_PRINT("FreeWSAOverlappedPlus()\n");
-			//	}
-
-			//	continue;
-			//}
-			
 			// Register new client
 			if (!HandleNewConnection(pOverlappedPlus->hClientSocket))
 			{
 				DEBUG_PRINT("HandleNewConnection()\n");
 				break;
 			}
-			
+
 			if (!FreeWSAOverlappedPlus(&pOverlappedPlus))
 			{
 				DEBUG_PRINT("FreeWSAOverlappedPlus()\n");
@@ -317,6 +353,7 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 			// All data sent, post recv
 			else
 			{
+				pContext->Reset();
 				// Free WSABuf here
 				if (!pContext->ScheduleRecv())
 				{
@@ -325,48 +362,39 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 				}
 				pContext->SetOpCode(IOCPContext::OP_WRITE);
 			}
-			
+
 			break;
 
 		case IOCPContext::OP_WRITE:
-			// Client is writing, server is reading, send response (echo)
+			// Client Has Written
+
 			DEBUG_PRINT("Client writing.\n");
-			char szBuffer[MAX_BUFFER_LEN];
 
-			// Recving data is handled by accept thread
-			if (!pContext->GetBuffer(szBuffer, sizeof(szBuffer)))
+			pContext->GetBufferContents(data);
+			data.resize(dwBytesTransfered);
+
+			pContext->RecvdBytesTotal += dwBytesTransfered;
+
+			while (m_MoreDataCb(data, dataLeft))
 			{
-				DEBUG_PRINT("CClientContext->GetBuffer()\n");
-				break;
+				pContext->ScheduleRecv(dwBytesTransfered, dataLeft);
 			}
 
-			//WriteToConsole(stdout, "Thread %d: Message: %s\n", nThreadNo, (char*)pkt.GetDataPointer());
+			pContext->SetBufferSize(pContext->RecvdBytesTotal);
 
-			// Send the message back to the client.
-			pContext->SetOpCode(IOCPContext::OP_READ);
-			pContext->SetTotalBytes(dwBytesTransfered);
 			pContext->SetSentBytes(0);
-			/*p_wbuf->len = dwBytesTransfered;
-			dwFlags = 0;
-			nBytesSent = WSASend(targetSock, p_wbuf, 1, &dwBytes, dwFlags, p_ol, NULL);*/
+			pContext->SetTotalSentBytes(0);
+			m_ProcessPacketCb(*pContext);
 
-			pContext->ScheduleSend();
-
-			if ((SOCKET_ERROR == nBytesSent) && (WSA_IO_PENDING != WSAGetLastError()))
-			{
-				DEBUG_PRINT("WSASend() %d\n", WSAGetLastError());
-				m_contextManager.RemoveContext(pContext);
-			}
-
+			pContext->SetOpCode(IOCPContext::OP_READ);
 			break;
 
 		default:
 			DEBUG_PRINT("Invaild Opcode\n");
 			break;
 		}
-		
-		DEBUG_PRINT("Thread exiting.\n");
 	}
 
+	DEBUG_PRINT("Thread exiting.\n");
 	return true;
 }
