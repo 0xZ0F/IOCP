@@ -3,16 +3,16 @@
 IOCP::IOCPContext::IOCPContext()
 {
 	m_pOverlapped = new WSAOVERLAPPED;
-	m_wsaData.resize(MAX_BUFFER_LEN);
+	m_wsaData.resize(INITIAL_BUFFER_LEN);
 
 	ZeroMemory(m_pOverlapped, sizeof(OVERLAPPED));
 
-	m_wsaBuf.buf = const_cast<char*>(m_wsaData.data());
-	m_wsaBuf.len = (ULONG)m_wsaData.length();
+	ResetBuffer();
 
 	m_nOpCode = 0;
-	m_nTotalBytes = 0;
-	m_nSentBytes = 0;
+	m_nSentBytesTotal = 0;
+	m_nSentBytesCur = 0;
+	RecvdBytesTotal = 0;
 }
 
 IOCP::IOCPContext::~IOCPContext()
@@ -30,24 +30,24 @@ int IOCP::IOCPContext::GetOpCode() const
 	return m_nOpCode;
 }
 
-void IOCP::IOCPContext::SetTotalBytes(int n)
+void IOCP::IOCPContext::SetTotalSentBytes(int n)
 {
-	m_nTotalBytes = n;
+	m_nSentBytesTotal = n;
 }
 
 int IOCP::IOCPContext::GetTotalBytes() const
 {
-	return m_nTotalBytes;
+	return m_nSentBytesTotal;
 }
 
 void IOCP::IOCPContext::SetSentBytes(int n)
 {
-	m_nSentBytes = n;
+	m_nSentBytesCur = n;
 }
 
 void IOCP::IOCPContext::IncSentBytes(int n)
 {
-	m_nSentBytes += n;
+	m_nSentBytesCur += n;
 }
 
 void IOCP::IOCPContext::SetSocket(SOCKET sock)
@@ -62,7 +62,7 @@ SOCKET IOCP::IOCPContext::GetSocketCopy() const
 
 int IOCP::IOCPContext::GetSentBytes() const
 {
-	return m_nSentBytes;
+	return m_nSentBytesCur;
 }
 
 OVERLAPPED* IOCP::IOCPContext::GetOverlapped() const
@@ -84,12 +84,15 @@ bool IOCP::IOCPContext::ScheduleSend()
 	return true;
 }
 
-bool IOCP::IOCPContext::ScheduleRecv()
+bool IOCP::IOCPContext::ScheduleRecv(size_t stOffset, size_t stToRead)
 {	
 	//ResetWSABUF();
 
 	DWORD dwFlags = 0;
 	DWORD dwBytes = 0;
+
+	SetBufferSize(stOffset + stToRead);
+	m_wsaBuf.buf += stOffset;
 
 	// Post a recv for this client
 	if (SOCKET_ERROR == WSARecv(GetSocketCopy(), &m_wsaBuf, 1, &dwBytes, &dwFlags, m_pOverlapped, NULL))
@@ -103,44 +106,28 @@ bool IOCP::IOCPContext::ScheduleRecv()
 	return true;
 }
 
-/// <summary>
-/// Copy the provided buffer into the private buffer.
-/// </summary>
-/// <param name="szBuffer">Buffer to copy into the private buffer.</param>
-/// <param name="len">Size of the provided buffer, not to be larger than the private buffer.</param>
-/// <returns>TRUE on success, FALSE on failure.</returns>
-BOOL IOCP::IOCPContext::SetBuffer(PCSTR szBuffer, size_t len)
+void IOCP::IOCPContext::SetBufferSize(size_t size)
 {
-	if (NULL == szBuffer || len < 1 || len > sizeof(m_wsaBuf.len))
-	{
-		return false;
-	}
-
-	memcpy_s(m_wsaBuf.buf, m_wsaBuf.len, szBuffer, len);
-	return true;
+	m_wsaData.resize(size);
+	m_wsaBuf.len = (ULONG)m_wsaData.length();
 }
 
-/// <summary>
-/// Copy from the private buffer into the provided buffer.
-/// </summary>
-/// <param name="szBuffer">Buffer to copy into.</param>
-/// <param name="len">Size of the buffer, not to be larger than the private buffer.</param>
-/// <returns>TRUE on success, FALSE on failure.</returns>
-BOOL IOCP::IOCPContext::GetBuffer(char* szBuffer, size_t len) const
+void IOCP::IOCPContext::GetBufferContents(std::string& strOut)
 {
-	if (NULL == szBuffer || len < 1 || len > sizeof(m_wsaBuf.len))
-	{
-		return false;
-	}
-
-	memcpy_s(szBuffer, len, m_wsaBuf.buf, sizeof(m_wsaBuf.len));
-	return true;
+	strOut.assign(m_wsaData.begin(), m_wsaData.end());
 }
 
-/// <summary>
-/// Zero the private buffer.
-/// </summary>
-void IOCP::IOCPContext::ZeroBuffer()
+void IOCP::IOCPContext::ResetBuffer()
 {
-	ZeroMemory(m_wsaBuf.buf, m_wsaBuf.len);
+	m_wsaData.clear();
+	m_wsaBuf.buf = m_wsaData.data();
+	m_wsaBuf.len = (ULONG)m_wsaData.length();
+}
+
+void IOCP::IOCPContext::Reset()
+{
+	ResetBuffer();
+	m_nSentBytesCur = 0;
+	m_nSentBytesTotal = 0;
+	RecvdBytesTotal = 0;
 }

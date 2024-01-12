@@ -4,7 +4,7 @@
 #include "UniqueSocket.hpp"
 
 // Buffer Length 
-#define MAX_BUFFER_LEN 256
+#define INITIAL_BUFFER_LEN 256
 
 namespace IOCP
 {
@@ -20,20 +20,23 @@ namespace IOCP
 		};
 	private:
 		OVERLAPPED* m_pOverlapped;
-		
+
 		// Will be used by the worker thread to decide what operation to perform.
 		int m_nOpCode;
-		
+
 		// Total sent bytes
-		int m_nTotalBytes;
-		
+		int m_nSentBytesTotal;
+
 		// Current number of sent bytes
-		int m_nSentBytes;
-		
+		int m_nSentBytesCur;
+
 		UniqueSocket m_hClientSocket;
-		
+
 		WSABUF m_wsaBuf;
 		std::string m_wsaData;
+
+	public:
+		DWORD RecvdBytesTotal;
 
 	public:
 		IOCPContext();
@@ -43,7 +46,7 @@ namespace IOCP
 		void SetOpCode(int n);
 
 		int GetTotalBytes() const;
-		void SetTotalBytes(int n);
+		void SetTotalSentBytes(int n);
 
 		int GetSentBytes() const;
 		void SetSentBytes(int n);
@@ -56,28 +59,21 @@ namespace IOCP
 
 		bool ScheduleSend();
 
-		bool ScheduleRecv();
-
 		/// <summary>
-		/// Copy the provided buffer into the private buffer.
+		/// Schedule a recv. If this is the first recieve, ensure the buffer is reset.
 		/// </summary>
-		/// <param name="szBuffer">Buffer to copy into the private buffer.</param>
-		/// <param name="len">Size of the provided buffer, not to be larger than the private buffer.</param>
-		/// <returns>TRUE on success, FALSE on failure.</returns>
-		BOOL SetBuffer(PCSTR szBuffer, size_t len);
+		/// <param name="stOffset">Offset into the existing buffer to write to.</param>
+		/// <param name="stToRead">Amount of data to read, this is in addition to any existing data.</param>
+		/// <returns>True on success, false otherwise.</returns>
+		bool ScheduleRecv(size_t stOffset = 0, size_t stToRead = INITIAL_BUFFER_LEN);
 
-		/// <summary>
-		/// Copy from the private buffer into the provided buffer.
-		/// </summary>
-		/// <param name="szBuffer">Buffer to copy into.</param>
-		/// <param name="len">Size of the buffer, not to be larger than the private buffer.</param>
-		/// <returns>TRUE on success, FALSE on failure.</returns>
-		BOOL GetBuffer(char* szBuffer, size_t len) const;
+		void SetBufferSize(size_t size);
 
-		/// <summary>
-		/// Zero the private buffer.
-		/// </summary>
-		void ZeroBuffer();
+		void GetBufferContents(std::string& strOut);
+
+		void ResetBuffer();
+
+		void Reset();
 	};
 }
 
