@@ -49,7 +49,10 @@ namespace IOCP
 		ProcessPacketCb_t m_ProcessPacketCb;
 
 	public:
-		IOCP();
+		IOCP(
+			MoreDataCb_t MoreDataCb = nullptr,
+			ProcessPacketCb_t ProcessPacketCb = nullptr
+		);
 		IOCP(const IOCP&) = delete;
 		IOCP(IOCP&&) = delete;
 		void operator=(const IOCP&) = delete;

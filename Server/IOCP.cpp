@@ -9,13 +9,23 @@
 
 #pragma comment (lib, "Ws2_32.lib")
 
-IOCP::IOCP::IOCP() :
+IOCP::IOCP::IOCP(MoreDataCb_t MoreDataCb, ProcessPacketCb_t ProcessPacketCb) :
 	m_hIOCP(UniqueHandle(NULL, CloseHandle)),
 	m_hShutdownEvent(UniqueHandle(NULL, CloseHandle)),
 	m_hAcceptEvent(UniqueWSAEvent(NULL, WSACloseEvent)),
-	m_MoreDataCb(std::bind(&IOCP::DefaultMoreDataCb, this, std::placeholders::_1, std::placeholders::_2)),
-	m_ProcessPacketCb(std::bind(&IOCP::DefaultProcessPacketCb, this, std::placeholders::_1))
-{}
+	m_MoreDataCb(MoreDataCb),
+	m_ProcessPacketCb(ProcessPacketCb)
+{
+	if(!m_MoreDataCb)
+	{
+		m_MoreDataCb = std::bind(&IOCP::DefaultMoreDataCb, this, std::placeholders::_1, std::placeholders::_2);
+	}
+
+	if(!m_ProcessPacketCb)
+	{
+		m_ProcessPacketCb = std::bind(&IOCP::DefaultProcessPacketCb, this, std::placeholders::_1);
+	}
+}
 
 bool IOCP::IOCP::Begin(unsigned short usPort)
 {
