@@ -32,6 +32,8 @@ namespace IOCP
 		// Number of bytes which have been sent so far.
 		DWORD BytesSent;
 
+		// Number of bytes to receive. Only set for partial reads.
+		DWORD BytesToRecv;
 		// Number of bytes received so far.
 		DWORD BytesRecvd;
 

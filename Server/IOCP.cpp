@@ -328,8 +328,15 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 			pContext->BytesRecvd += dwBytesTransfered;
 			data.resize(pContext->BytesRecvd);
 
+			if(pContext->BytesToRecv > 0 && (pContext->BytesToRecv < pContext->BytesRecvd))
+			{
+				pContext->ScheduleRecv(pContext->BytesRecvd, pContext->BytesToRecv - pContext->BytesRecvd);
+				break;
+			}
+
 			if(m_MoreDataCb(data, stDataLeft))
 			{
+				pContext->BytesToRecv = pContext->BytesRecvd + (ULONG)stDataLeft;
 				pContext->ScheduleRecv(pContext->BytesRecvd, (ULONG)stDataLeft);
 				break;
 			}
@@ -340,6 +347,7 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 			pContext->BytesToSend = 0;
 			m_ProcessPacketCb(*pContext);
 
+			pContext->BytesToRecv = 0;
 			pContext->OpCode = IOCPContext::OP_READ;
 			break;
 
