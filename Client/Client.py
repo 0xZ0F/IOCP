@@ -25,6 +25,8 @@ def main():
                 data = data.encode()
 
                 buf = struct.pack(f"!LHH{len(data)}s", size, op, index, data)
+                buf += b"\x00"
+
                 print(f"Send: {buf}")
 
                 print(len(buf))
@@ -32,7 +34,7 @@ def main():
 
                 sock.send(buf)
 
-                resp = sock.recv(1024)
+                resp = sock.recv(len(buf))
 
                 print(f"Recv: {resp}")
 
