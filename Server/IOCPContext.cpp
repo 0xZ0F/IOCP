@@ -9,45 +9,15 @@ IOCP::IOCPContext::IOCPContext()
 
 	ResetBuffer();
 
-	m_nOpCode = 0;
-	m_nSentBytesTotal = 0;
-	m_nSentBytesCur = 0;
-	RecvdBytesTotal = 0;
+	OpCode = 0;
+	BytesToSend = 0;
+	BytesSent = 0;
+	BytesRecvd = 0;
 }
 
 IOCP::IOCPContext::~IOCPContext()
 {
 	delete m_pOverlapped;
-}
-
-void IOCP::IOCPContext::SetOpCode(int n)
-{
-	m_nOpCode = n;
-}
-
-int IOCP::IOCPContext::GetOpCode() const
-{
-	return m_nOpCode;
-}
-
-void IOCP::IOCPContext::SetTotalSentBytes(int n)
-{
-	m_nSentBytesTotal = n;
-}
-
-int IOCP::IOCPContext::GetTotalBytes() const
-{
-	return m_nSentBytesTotal;
-}
-
-void IOCP::IOCPContext::SetSentBytes(int n)
-{
-	m_nSentBytesCur = n;
-}
-
-void IOCP::IOCPContext::IncSentBytes(int n)
-{
-	m_nSentBytesCur += n;
 }
 
 void IOCP::IOCPContext::SetSocket(SOCKET sock)
@@ -60,23 +30,26 @@ SOCKET IOCP::IOCPContext::GetSocketCopy() const
 	return m_hClientSocket.GetSocket();
 }
 
-int IOCP::IOCPContext::GetSentBytes() const
-{
-	return m_nSentBytesCur;
-}
-
 OVERLAPPED* IOCP::IOCPContext::GetOverlapped() const
 {
 	return m_pOverlapped;
 }
 
-bool IOCP::IOCPContext::ScheduleSend()
+bool IOCP::IOCPContext::ScheduleSend(ULONG ulOffset)
 {
 	DWORD dwRet = 0;
 	DWORD dwSent = 0;
-	dwRet = WSASend(m_hClientSocket.GetSocket(), &m_wsaBuf, 1, &dwSent, 0, m_pOverlapped, NULL);
 
-	if ((SOCKET_ERROR == dwRet) && (WSA_IO_PENDING != WSAGetLastError()))
+	if(ulOffset >= m_wsaBuf.len)
+	{
+		return false;
+	}
+
+	m_wsaBuf.buf = m_wsaData.data() + ulOffset;
+	m_wsaBuf.len -= ulOffset;
+
+	dwRet = WSASend(m_hClientSocket.GetSocket(), &m_wsaBuf, 1, &dwSent, 0, m_pOverlapped, NULL);
+	if((SOCKET_ERROR == dwRet) && (WSA_IO_PENDING != WSAGetLastError()))
 	{
 		return false;
 	}
@@ -85,19 +58,25 @@ bool IOCP::IOCPContext::ScheduleSend()
 }
 
 bool IOCP::IOCPContext::ScheduleRecv(size_t stOffset, size_t stToRead)
-{	
+{
 	//ResetWSABUF();
 
 	DWORD dwFlags = 0;
 	DWORD dwBytes = 0;
 
-	SetBufferSize(stOffset + stToRead);
-	m_wsaBuf.buf += stOffset;
+	size_t finalIndex = stOffset + stToRead;
+
+	if(finalIndex > m_wsaBuf.len)
+	{
+		SetBufferSize(finalIndex);
+	}
+	m_wsaBuf.buf = m_wsaData.data() + stOffset;
+	m_wsaBuf.len = stToRead;
 
 	// Post a recv for this client
-	if (SOCKET_ERROR == WSARecv(GetSocketCopy(), &m_wsaBuf, 1, &dwBytes, &dwFlags, m_pOverlapped, NULL))
+	if(SOCKET_ERROR == WSARecv(GetSocketCopy(), &m_wsaBuf, 1, &dwBytes, &dwFlags, m_pOverlapped, NULL))
 	{
-		if (WSA_IO_PENDING != WSAGetLastError())
+		if(WSA_IO_PENDING != WSAGetLastError())
 		{
 			return false;
 		}
@@ -127,7 +106,7 @@ void IOCP::IOCPContext::ResetBuffer()
 void IOCP::IOCPContext::Reset()
 {
 	ResetBuffer();
-	m_nSentBytesCur = 0;
-	m_nSentBytesTotal = 0;
-	RecvdBytesTotal = 0;
+	BytesSent = 0;
+	BytesToSend = 0;
+	BytesRecvd = 0;
 }

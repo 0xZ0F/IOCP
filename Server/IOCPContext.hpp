@@ -21,43 +21,33 @@ namespace IOCP
 	private:
 		OVERLAPPED* m_pOverlapped;
 
-		// Will be used by the worker thread to decide what operation to perform.
-		int m_nOpCode;
-
-		// Total sent bytes
-		int m_nSentBytesTotal;
-
-		// Current number of sent bytes
-		int m_nSentBytesCur;
-
 		UniqueSocket m_hClientSocket;
 
 		WSABUF m_wsaBuf;
 		std::string m_wsaData;
 
 	public:
-		DWORD RecvdBytesTotal;
+		// Total number of bytes to be sent.
+		DWORD BytesToSend;
+		// Number of bytes which have been sent so far.
+		DWORD BytesSent;
+
+		// Number of bytes received so far.
+		DWORD BytesRecvd;
+
+		// Current opcode (Ex. IOCPContext::OP_READ or IOCPContext::OP_WRITE)
+		DWORD OpCode;
 
 	public:
 		IOCPContext();
 		~IOCPContext();
-
-		int GetOpCode() const;
-		void SetOpCode(int n);
-
-		int GetTotalBytes() const;
-		void SetTotalSentBytes(int n);
-
-		int GetSentBytes() const;
-		void SetSentBytes(int n);
-		void IncSentBytes(int n);
 
 		void SetSocket(SOCKET sock);
 		SOCKET GetSocketCopy() const;
 
 		OVERLAPPED* GetOverlapped() const;
 
-		bool ScheduleSend();
+		bool ScheduleSend(ULONG ulOffset = 0);
 
 		/// <summary>
 		/// Schedule a recv. If this is the first recieve, ensure the buffer is reset.

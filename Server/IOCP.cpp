@@ -21,7 +21,7 @@ bool IOCP::IOCP::Begin(unsigned short usPort)
 {
 	// Initialize Winsock
 	WSADATA wsaData = { 0 };
-	if (NO_ERROR != WSAStartup(MAKEWORD(2, 2), &wsaData))
+	if(NO_ERROR != WSAStartup(MAKEWORD(2, 2), &wsaData))
 	{
 		return false;
 	}
@@ -35,13 +35,13 @@ bool IOCP::IOCP::Begin(unsigned short usPort)
 			0),
 		CloseHandle);
 
-	if (!m_hIOCP)
+	if(!m_hIOCP)
 	{
 		return false;
 	}
 
 	//Create 3 worker threads to start
-	for (int x = 0; x < 3; x++)
+	for(int x = 0; x < 3; x++)
 	{
 		IOCPThreadInfo threadInfo;
 		threadInfo.pParam = IntToPtr(x + 1);
@@ -50,12 +50,12 @@ bool IOCP::IOCP::Begin(unsigned short usPort)
 		m_vThreads.push_back(std::move(newThread));
 	}
 
-	if (!CreateListeningSocket(usPort))
+	if(!CreateListeningSocket(usPort))
 	{
 		return false;
 	}
 
-	if (!ScheduleAccept())
+	if(!ScheduleAccept())
 	{
 		return false;
 	}
@@ -65,12 +65,16 @@ bool IOCP::IOCP::Begin(unsigned short usPort)
 
 bool IOCP::IOCP::DefaultMoreDataCb(const std::string_view& recvd, size_t& amountLeft)
 {
-	if (0 != recvd.back())
+	if(0 != recvd.back())
 	{
 		amountLeft = 1;
+		return true;
 	}
-
-	return 0 == amountLeft;
+	else
+	{
+		amountLeft = 0;
+		return false;
+	}
 }
 
 bool IOCP::IOCP::DefaultProcessPacketCb(IOCPContext& context)
@@ -80,12 +84,12 @@ bool IOCP::IOCP::DefaultProcessPacketCb(IOCPContext& context)
 
 	unsigned char* buf = (unsigned char*)packet.c_str();
 	int i, j;
-	for (i = 0; i < packet.length(); i += 16)
+	for(i = 0; i < packet.length(); i += 16)
 	{
 		printf("%06x: ", i);
-		for (j = 0; j < 16; j++)
+		for(j = 0; j < 16; j++)
 		{
-			if (i + j < packet.length())
+			if(i + j < packet.length())
 			{
 				printf("%02x ", buf[i + j]);
 			}
@@ -96,9 +100,9 @@ bool IOCP::IOCP::DefaultProcessPacketCb(IOCPContext& context)
 		}
 
 		printf(" ");
-		for (j = 0; j < 16; j++)
+		for(j = 0; j < 16; j++)
 		{
-			if (i + j < packet.length())
+			if(i + j < packet.length())
 			{
 				printf("%c", isprint(buf[i + j]) ? buf[i + j] : '.');
 			}
@@ -106,7 +110,7 @@ bool IOCP::IOCP::DefaultProcessPacketCb(IOCPContext& context)
 		printf("\n");
 	}
 
-	context.SetTotalSentBytes(context.RecvdBytesTotal);
+	context.BytesToSend = context.BytesRecvd;
 	context.ScheduleSend();
 
 	return true;
@@ -114,7 +118,7 @@ bool IOCP::IOCP::DefaultProcessPacketCb(IOCPContext& context)
 
 bool IOCP::IOCP::CreateListeningSocket(unsigned short usPort)
 {
-	if (!m_hListenSocket.CreateSocketW(
+	if(!m_hListenSocket.CreateSocketW(
 		AF_INET,
 		SOCK_STREAM,
 		0,
@@ -127,19 +131,19 @@ bool IOCP::IOCP::CreateListeningSocket(unsigned short usPort)
 
 	std::shared_ptr<IOCPContext> pListenContext = m_contextManager.CreateContext();
 	pListenContext->SetSocket(m_hListenSocket.GetSocket());
-	pListenContext->SetOpCode(IOCPContext::OP_LISTEN);
+	pListenContext->OpCode = IOCPContext::OP_LISTEN;
 	AssociateWithIOCP(pListenContext.get());
 
 	struct sockaddr_in servAddr = { 0 };
 	servAddr.sin_family = AF_INET;
 	servAddr.sin_addr.s_addr = INADDR_ANY;
 	servAddr.sin_port = htons(usPort);
-	if (SOCKET_ERROR == bind(m_hListenSocket.GetSocket(), (struct sockaddr*)&servAddr, sizeof(servAddr)))
+	if(SOCKET_ERROR == bind(m_hListenSocket.GetSocket(), (struct sockaddr*)&servAddr, sizeof(servAddr)))
 	{
 		return false;
 	}
 
-	if (SOCKET_ERROR == listen(m_hListenSocket.GetSocket(), SOMAXCONN))
+	if(SOCKET_ERROR == listen(m_hListenSocket.GetSocket(), SOMAXCONN))
 	{
 		return false;
 	}
@@ -156,20 +160,20 @@ bool IOCP::IOCP::ScheduleAccept()
 	GUID guidAcceptEx = WSAID_ACCEPTEX;
 	WSAOVERLAPPEDPLUS* pOverlappedPlus = AllocWSAOverlappedPlus((sizeof(SOCKADDR_IN) + 16) * 2); // See MSDN for size.
 
-	if (!pOverlappedPlus)
+	if(!pOverlappedPlus)
 	{
 		return false;
 	}
 
 	preemptiveSocket = WSASocketW(AF_INET, SOCK_STREAM, 0, NULL, 0, WSA_FLAG_OVERLAPPED);
-	if (INVALID_SOCKET == preemptiveSocket)
+	if(INVALID_SOCKET == preemptiveSocket)
 	{
 		//WriteToConsole(stderr, "WSASocketW() %d\n", WSAGetLastError());
 		delete pOverlappedPlus;
 		return FALSE;
 	}
 
-	if (SOCKET_ERROR == WSAIoctl(m_hListenSocket.GetSocket(),
+	if(SOCKET_ERROR == WSAIoctl(m_hListenSocket.GetSocket(),
 		SIO_GET_EXTENSION_FUNCTION_POINTER,
 		&guidAcceptEx,
 		sizeof(guidAcceptEx),
@@ -188,7 +192,7 @@ bool IOCP::IOCP::ScheduleAccept()
 	pOverlappedPlus->hClientSocket = preemptiveSocket;
 	pOverlappedPlus->hListenSocket = m_hListenSocket.GetSocket();
 
-	if (FALSE == lpfnAcceptEx(
+	if(FALSE == lpfnAcceptEx(
 		m_hListenSocket.GetSocket(),
 		preemptiveSocket,
 		pOverlappedPlus->pAcceptBuf,
@@ -198,7 +202,7 @@ bool IOCP::IOCP::ScheduleAccept()
 		&pOverlappedPlus->dwBytesReceived,
 		&pOverlappedPlus->wsaOverlapped))
 	{
-		if (ERROR_IO_PENDING != WSAGetLastError())
+		if(ERROR_IO_PENDING != WSAGetLastError())
 		{
 			//WriteToConsole(stderr, "AcceptEx() %d\n", WSAGetLastError());
 			FreeWSAOverlappedPlus(&pOverlappedPlus);
@@ -213,26 +217,26 @@ bool IOCP::IOCP::HandleNewConnection(SOCKET clientListenSock)
 {
 	// Create context for new client
 	auto pContext = std::make_shared<IOCPContext>();
-	pContext->SetOpCode(IOCPContext::OP_WRITE);
+	pContext->OpCode = IOCPContext::OP_WRITE;
 	pContext->SetSocket(clientListenSock);
 
 	m_contextManager.AddContext(pContext);
 
-	if (FALSE == AssociateWithIOCP(pContext.get()))
+	if(FALSE == AssociateWithIOCP(pContext.get()))
 	{
 		DEBUG_PRINT("AssociateWithIOCP()\n");
 		m_contextManager.RemoveContext(pContext);
 		return false;
 	}
 
-	if (!pContext->ScheduleRecv())
+	if(!pContext->ScheduleRecv())
 	{
 		DEBUG_PRINT("ScheduleRecv()\n");
 		m_contextManager.RemoveContext(pContext);
 		return false;
 	}
 
-	if (!ScheduleAccept())
+	if(!ScheduleAccept())
 	{
 		DEBUG_PRINT("ScheduleAccept()\n");
 		m_contextManager.RemoveContext(pContext);
@@ -248,7 +252,7 @@ bool IOCP::IOCP::AssociateWithIOCP(const IOCPContext* pContext)
 
 	// Associate the socket with IOCP
 	HANDLE hTemp = CreateIoCompletionPort((HANDLE)sock, m_hIOCP.get(), (ULONG_PTR)pContext, 0);
-	if (NULL == hTemp)
+	if(NULL == hTemp)
 	{
 		// TODO: Remove Context
 		return false;
@@ -268,7 +272,7 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 	WSAOVERLAPPEDPLUS* pOverlappedPlus = NULL;
 	SOCKET targetSock = INVALID_SOCKET;
 
-	while (WAIT_OBJECT_0 != WaitForSingleObject(m_hShutdownEvent.get(), 0))
+	while(WAIT_OBJECT_0 != WaitForSingleObject(m_hShutdownEvent.get(), 0))
 	{
 		BOOL bReturn = GetQueuedCompletionStatus(
 			m_hIOCP.get(),
@@ -283,15 +287,15 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 		///
 
 		// This catches errors and the destructor
-		if (NULL == pContext)
+		if(NULL == pContext)
 		{
 			break;
 		}
 
 		// Client disconnect check
-		if (pContext->GetOpCode() != IOCPContext::OP_READ && m_hListenSocket.GetSocket() != pContext->GetSocketCopy())
+		if(pContext->OpCode != IOCPContext::OP_READ && m_hListenSocket.GetSocket() != pContext->GetSocketCopy())
 		{
-			if ((FALSE == bReturn) || ((TRUE == bReturn) && (0 == dwBytesTransfered)))
+			if((FALSE == bReturn) || ((TRUE == bReturn) && (0 == dwBytesTransfered)))
 			{
 				// Client disconnected
 				DEBUG_PRINT("Client Disconnected\n");
@@ -303,9 +307,9 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 		int nBytesRecv = 0;
 		DWORD dwFlags = 0;
 		WSAOVERLAPPED* p_ol = pContext->GetOverlapped();
-		std::string data;
-		size_t dataLeft;
-		switch (pContext->GetOpCode())
+		std::string data{};
+		size_t dataLeft = 0;
+		switch(pContext->OpCode)
 		{
 		case IOCPContext::OP_ACCEPT:
 			break;
@@ -316,13 +320,13 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 			pOverlappedPlus = CONTAINING_RECORD(pOverlapped, WSAOVERLAPPEDPLUS, wsaOverlapped);
 
 			// Register new client
-			if (!HandleNewConnection(pOverlappedPlus->hClientSocket))
+			if(!HandleNewConnection(pOverlappedPlus->hClientSocket))
 			{
 				DEBUG_PRINT("HandleNewConnection()\n");
 				break;
 			}
 
-			if (!FreeWSAOverlappedPlus(&pOverlappedPlus))
+			if(!FreeWSAOverlappedPlus(&pOverlappedPlus))
 			{
 				DEBUG_PRINT("FreeWSAOverlappedPlus()\n");
 			}
@@ -332,35 +336,28 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 		case IOCPContext::OP_READ:
 			// Client is reading, server is writing
 			DEBUG_PRINT("Read %d bytes.\n", dwBytesTransfered);
-			pContext->IncSentBytes(dwBytesTransfered);
+
+			pContext->BytesSent += dwBytesTransfered;
 
 			// If not all data has been sent
-			if (pContext->GetSentBytes() < pContext->GetTotalBytes())
+			if(pContext->BytesSent < pContext->BytesToSend)
 			{
-				/*pContext->SetOpCode(IOCPContext::OP_READ);
-
-				p_wbuf->buf += pContext->GetSentBytes();
-				p_wbuf->len = pContext->GetTotalBytes() - pContext->GetSentBytes();
-				dwFlags = 0;
-				nBytesSent = WSASend(pContext->GetSocket(), p_wbuf, 1, &dwBytes, dwFlags, p_ol, NULL);
-
-				if ((SOCKET_ERROR == nBytesSent) && (WSA_IO_PENDING != WSAGetLastError()))
+				if(!pContext->ScheduleSend(pContext->BytesSent))
 				{
-					DEBUG_PRINT("WSASend() %d\n", WSAGetLastError());
+					DEBUG_PRINT("ScheduleSend() %d\n", WSAGetLastError());
 					m_contextManager.RemoveContext(pContext);
-				}*/
+					break;
+				}
 			}
-			// All data sent, post recv
-			else
+			else // All data sent, post recv
 			{
 				pContext->Reset();
-				// Free WSABuf here
-				if (!pContext->ScheduleRecv())
+				if(!pContext->ScheduleRecv())
 				{
 					DEBUG_PRINT("pContext->ScheduleRecv()() %d\n", WSAGetLastError());
 					m_contextManager.RemoveContext(pContext);
 				}
-				pContext->SetOpCode(IOCPContext::OP_WRITE);
+				pContext->OpCode = IOCPContext::OP_WRITE;
 			}
 
 			break;
@@ -371,22 +368,22 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 			DEBUG_PRINT("Client writing.\n");
 
 			pContext->GetBufferContents(data);
-			data.resize(dwBytesTransfered);
+			pContext->BytesRecvd += dwBytesTransfered;
+			data.resize(pContext->BytesRecvd);
 
-			pContext->RecvdBytesTotal += dwBytesTransfered;
-
-			while (m_MoreDataCb(data, dataLeft))
+			if(m_MoreDataCb(data, dataLeft))
 			{
-				pContext->ScheduleRecv(dwBytesTransfered, dataLeft);
+				pContext->ScheduleRecv(pContext->BytesRecvd, dataLeft);
+				break;
 			}
 
-			pContext->SetBufferSize(pContext->RecvdBytesTotal);
+			pContext->SetBufferSize(pContext->BytesRecvd);
 
-			pContext->SetSentBytes(0);
-			pContext->SetTotalSentBytes(0);
+			pContext->BytesSent = 0;
+			pContext->BytesToSend = 0;
 			m_ProcessPacketCb(*pContext);
 
-			pContext->SetOpCode(IOCPContext::OP_READ);
+			pContext->OpCode = IOCPContext::OP_READ;
 			break;
 
 		default:
