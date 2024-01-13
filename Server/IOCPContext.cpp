@@ -57,21 +57,21 @@ bool IOCP::IOCPContext::ScheduleSend(ULONG ulOffset)
 	return true;
 }
 
-bool IOCP::IOCPContext::ScheduleRecv(size_t stOffset, size_t stToRead)
+bool IOCP::IOCPContext::ScheduleRecv(ULONG ulOffset, ULONG ulToRead)
 {
 	//ResetWSABUF();
 
 	DWORD dwFlags = 0;
 	DWORD dwBytes = 0;
 
-	size_t finalIndex = stOffset + stToRead;
+	size_t finalIndex = ulOffset + ulToRead;
 
 	if(finalIndex > m_wsaBuf.len)
 	{
 		SetBufferSize(finalIndex);
 	}
-	m_wsaBuf.buf = m_wsaData.data() + stOffset;
-	m_wsaBuf.len = stToRead;
+	m_wsaBuf.buf = m_wsaData.data() + ulOffset;
+	m_wsaBuf.len = ulToRead;
 
 	// Post a recv for this client
 	if(SOCKET_ERROR == WSARecv(GetSocketCopy(), &m_wsaBuf, 1, &dwBytes, &dwFlags, m_pOverlapped, NULL))

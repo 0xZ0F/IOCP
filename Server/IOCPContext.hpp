@@ -55,7 +55,7 @@ namespace IOCP
 		/// <param name="stOffset">Offset into the existing buffer to write to.</param>
 		/// <param name="stToRead">Amount of data to read, this is in addition to any existing data.</param>
 		/// <returns>True on success, false otherwise.</returns>
-		bool ScheduleRecv(size_t stOffset = 0, size_t stToRead = INITIAL_BUFFER_LEN);
+		bool ScheduleRecv(ULONG ulOffset = 0, ULONG ulToRead = INITIAL_BUFFER_LEN);
 
 		void SetBufferSize(size_t size);
 

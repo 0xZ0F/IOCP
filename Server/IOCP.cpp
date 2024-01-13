@@ -63,59 +63,6 @@ bool IOCP::IOCP::Begin(unsigned short usPort)
 	return true;
 }
 
-bool IOCP::IOCP::DefaultMoreDataCb(const std::string_view& recvd, size_t& amountLeft)
-{
-	if(0 != recvd.back())
-	{
-		amountLeft = 1;
-		return true;
-	}
-	else
-	{
-		amountLeft = 0;
-		return false;
-	}
-}
-
-bool IOCP::IOCP::DefaultProcessPacketCb(IOCPContext& context)
-{
-	std::string packet{};
-	context.GetBufferContents(packet);
-
-	unsigned char* buf = (unsigned char*)packet.c_str();
-	int i, j;
-	for(i = 0; i < packet.length(); i += 16)
-	{
-		printf("%06x: ", i);
-		for(j = 0; j < 16; j++)
-		{
-			if(i + j < packet.length())
-			{
-				printf("%02x ", buf[i + j]);
-			}
-			else
-			{
-				printf("   ");
-			}
-		}
-
-		printf(" ");
-		for(j = 0; j < 16; j++)
-		{
-			if(i + j < packet.length())
-			{
-				printf("%c", isprint(buf[i + j]) ? buf[i + j] : '.');
-			}
-		}
-		printf("\n");
-	}
-
-	context.BytesToSend = context.BytesRecvd;
-	context.ScheduleSend();
-
-	return true;
-}
-
 bool IOCP::IOCP::CreateListeningSocket(unsigned short usPort)
 {
 	if(!m_hListenSocket.CreateSocketW(
@@ -308,7 +255,7 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 		DWORD dwFlags = 0;
 		WSAOVERLAPPED* p_ol = pContext->GetOverlapped();
 		std::string data{};
-		size_t dataLeft = 0;
+		size_t stDataLeft = 0;
 		switch(pContext->OpCode)
 		{
 		case IOCPContext::OP_ACCEPT:
@@ -371,9 +318,9 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 			pContext->BytesRecvd += dwBytesTransfered;
 			data.resize(pContext->BytesRecvd);
 
-			if(m_MoreDataCb(data, dataLeft))
+			if(m_MoreDataCb(data, stDataLeft))
 			{
-				pContext->ScheduleRecv(pContext->BytesRecvd, dataLeft);
+				pContext->ScheduleRecv(pContext->BytesRecvd, (ULONG)stDataLeft);
 				break;
 			}
 
