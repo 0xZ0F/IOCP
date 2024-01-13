@@ -23,6 +23,7 @@ namespace IOCP
 	public:
 		/// <summary>
 		/// Callback type used for determining how much more data needs to be read.
+		/// It is recommended to have a limit on how large a packet can be.
 		/// </summary>
 		using MoreDataCb_t = std::function<bool(const std::string_view& recvd, size_t& amountLeft)>;
 
