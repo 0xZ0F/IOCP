@@ -138,6 +138,7 @@
     <ClCompile Include="IOCP.cpp" />
     <ClCompile Include="IOCPContext.cpp" />
     <ClCompile Include="IOCPContextManager.cpp" />
+    <ClCompile Include="IOCPDefaultCallbacks.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="UniqueSocket.cpp" />
   </ItemGroup>
