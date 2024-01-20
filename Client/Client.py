@@ -11,7 +11,7 @@ def main():
     parser.add_argument("port", type=int, metavar="port", help="Port of server")
     args = parser.parse_args()
 
-    print("Tunnel client started.")
+    print("Client started.")
 
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:

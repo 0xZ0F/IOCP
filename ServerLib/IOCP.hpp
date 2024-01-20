@@ -9,7 +9,6 @@
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#include <WinSock2.h>
 
 #include "UniqueSocket.hpp"
 #include "IOCPContextManager.hpp"
@@ -34,13 +33,11 @@ namespace IOCP
 		using ProcessPacketCb_t = std::function<bool(IOCPContext& context)>;
 
 		using UniqueHandle = std::unique_ptr<void, decltype(&CloseHandle)>;
-		using UniqueWSAEvent = std::unique_ptr<void, decltype(&WSACloseEvent)>;
 
 	protected:
 		IOCPContextManager m_contextManager;
 
 		UniqueSocket m_hListenSocket;
-		UniqueWSAEvent m_hAcceptEvent;
 		UniqueHandle m_hShutdownEvent;
 		UniqueHandle m_hIOCP;
 		std::vector<std::thread> m_vThreads;
@@ -49,24 +46,29 @@ namespace IOCP
 		ProcessPacketCb_t m_ProcessPacketCb;
 
 	public:
-		IOCP();
+		IOCP(
+			MoreDataCb_t MoreDataCb = nullptr,
+			ProcessPacketCb_t ProcessPacketCb = nullptr
+		);
 		IOCP(const IOCP&) = delete;
 		IOCP(IOCP&&) = delete;
 		void operator=(const IOCP&) = delete;
 		void operator=(IOCP&&) = delete;
+
+		~IOCP();
 
 		/// <summary>
 		/// Begin accepting clients.
 		/// </summary>
 		/// <param name="usPort"></param>
 		/// <returns></returns>
-		bool Begin(unsigned short usPort);
+		bool Begin(USHORT usPort, UINT8 uInitialWorkerThreads = 3);
 
 	protected:
 		bool DefaultMoreDataCb(const std::string_view& recvd, size_t& amountLeft);
 		bool DefaultProcessPacketCb(IOCPContext& context);
 
-		bool CreateListeningSocket(unsigned short usPort);
+		bool CreateListeningSocket(USHORT usPort);
 		bool ScheduleAccept();
 		bool HandleNewConnection(SOCKET clientListenSock);
 		bool AssociateWithIOCP(const IOCPContext* pContext);

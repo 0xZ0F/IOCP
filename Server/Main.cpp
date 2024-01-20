@@ -1,11 +1,8 @@
 #include <iostream>
 
-#include "DebugPrint.h"
-#include "IOCP.hpp"
-
-#ifndef NDEBUG
-Logger::Logger _g_logger;
-#endif
+#include "Logger/Logger.hpp"
+#include "ServerLib/DebugPrint.h"
+#include "ServerLib/IOCP.hpp"
 
 int main(int argc, char** argv)
 {

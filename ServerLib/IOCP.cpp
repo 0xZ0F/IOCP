@@ -9,24 +9,56 @@
 
 #pragma comment (lib, "Ws2_32.lib")
 
-IOCP::IOCP::IOCP() :
+#ifndef NDEBUG
+Logger::Logger _g_IOCPLog{};
+#endif
+
+IOCP::IOCP::IOCP(MoreDataCb_t MoreDataCb, ProcessPacketCb_t ProcessPacketCb) :
 	m_hIOCP(UniqueHandle(NULL, CloseHandle)),
 	m_hShutdownEvent(UniqueHandle(NULL, CloseHandle)),
-	m_hAcceptEvent(UniqueWSAEvent(NULL, WSACloseEvent)),
-	m_MoreDataCb(std::bind(&IOCP::DefaultMoreDataCb, this, std::placeholders::_1, std::placeholders::_2)),
-	m_ProcessPacketCb(std::bind(&IOCP::DefaultProcessPacketCb, this, std::placeholders::_1))
-{}
-
-bool IOCP::IOCP::Begin(unsigned short usPort)
+	m_MoreDataCb(MoreDataCb),
+	m_ProcessPacketCb(ProcessPacketCb)
 {
-	// Initialize Winsock
+	if(!m_MoreDataCb)
+	{
+		m_MoreDataCb = std::bind(&IOCP::DefaultMoreDataCb, this, std::placeholders::_1, std::placeholders::_2);
+	}
+
+	if(!m_ProcessPacketCb)
+	{
+		m_ProcessPacketCb = std::bind(&IOCP::DefaultProcessPacketCb, this, std::placeholders::_1);
+	}
+}
+
+IOCP::IOCP::~IOCP()
+{
+	if(SetEvent(m_hShutdownEvent.get()))
+	{
+		for(auto& thread : m_vThreads)
+		{
+			thread.join();
+		}
+	}
+	else
+	{
+		DEBUG_PRINT("SetEvent(m_hShutdownEvent.get()) %d\n", GetLastError());
+	}
+}
+
+bool IOCP::IOCP::Begin(USHORT usPort, UINT8 uInitialWorkerThreads)
+{
+	m_hShutdownEvent = { CreateEventW(NULL, TRUE, FALSE, NULL), CloseHandle };
+	if(!m_hShutdownEvent.get())
+	{
+		return false;
+	}
+
 	WSADATA wsaData = { 0 };
 	if(NO_ERROR != WSAStartup(MAKEWORD(2, 2), &wsaData))
 	{
 		return false;
 	}
 
-	//Create I/O completion port
 	m_hIOCP = UniqueHandle(
 		CreateIoCompletionPort(
 			INVALID_HANDLE_VALUE,
@@ -40,8 +72,7 @@ bool IOCP::IOCP::Begin(unsigned short usPort)
 		return false;
 	}
 
-	//Create 3 worker threads to start
-	for(int x = 0; x < 3; x++)
+	for(int x = 0; x < uInitialWorkerThreads; x++)
 	{
 		IOCPThreadInfo threadInfo;
 		threadInfo.pParam = IntToPtr(x + 1);
@@ -63,7 +94,7 @@ bool IOCP::IOCP::Begin(unsigned short usPort)
 	return true;
 }
 
-bool IOCP::IOCP::CreateListeningSocket(unsigned short usPort)
+bool IOCP::IOCP::CreateListeningSocket(USHORT usPort)
 {
 	if(!m_hListenSocket.CreateSocketW(
 		AF_INET,
@@ -221,28 +252,37 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 
 	while(WAIT_OBJECT_0 != WaitForSingleObject(m_hShutdownEvent.get(), 0))
 	{
-		BOOL bReturn = GetQueuedCompletionStatus(
+		BOOL fReturn = GetQueuedCompletionStatus(
 			m_hIOCP.get(),
 			&dwBytesTransfered,
 			(PULONG_PTR)&pContext,
 			&pOverlapped,
-			INFINITE
+			100
 		);
 
-		///
-		/// TODO: Better GetQueuedCompletionStatus() checks
-		///
-
-		// This catches errors and the destructor
-		if(NULL == pContext)
+		// https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatus
+		if(!fReturn)
 		{
-			break;
+			if(!pOverlapped)
+			{
+				if(WAIT_TIMEOUT != GetLastError())
+				{
+					// ERROR_ABANDONED_WAIT_0
+					break;
+				}
+				continue;
+			}
+
+			if(!pContext)
+			{
+				break;
+			}
 		}
 
 		// Client disconnect check
 		if(pContext->OpCode != IOCPContext::OP_READ && m_hListenSocket.GetSocket() != pContext->GetSocketCopy())
 		{
-			if((FALSE == bReturn) || ((TRUE == bReturn) && (0 == dwBytesTransfered)))
+			if((!fReturn) || (fReturn && !dwBytesTransfered))
 			{
 				// Client disconnected
 				DEBUG_PRINT("Client Disconnected\n");
@@ -318,8 +358,15 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 			pContext->BytesRecvd += dwBytesTransfered;
 			data.resize(pContext->BytesRecvd);
 
+			if(pContext->BytesToRecv > 0 && (pContext->BytesToRecv < pContext->BytesRecvd))
+			{
+				pContext->ScheduleRecv(pContext->BytesRecvd, pContext->BytesToRecv - pContext->BytesRecvd);
+				break;
+			}
+
 			if(m_MoreDataCb(data, stDataLeft))
 			{
+				pContext->BytesToRecv = pContext->BytesRecvd + (ULONG)stDataLeft;
 				pContext->ScheduleRecv(pContext->BytesRecvd, (ULONG)stDataLeft);
 				break;
 			}
@@ -330,6 +377,7 @@ bool IOCP::IOCP::WorkerThread(IOCPThreadInfo&& threadInfo)
 			pContext->BytesToSend = 0;
 			m_ProcessPacketCb(*pContext);
 
+			pContext->BytesToRecv = 0;
 			pContext->OpCode = IOCPContext::OP_READ;
 			break;
 
