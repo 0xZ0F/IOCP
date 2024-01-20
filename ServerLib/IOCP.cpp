@@ -9,6 +9,10 @@
 
 #pragma comment (lib, "Ws2_32.lib")
 
+#ifndef NDEBUG
+Logger::Logger _g_IOCPLog{};
+#endif
+
 IOCP::IOCP::IOCP(MoreDataCb_t MoreDataCb, ProcessPacketCb_t ProcessPacketCb) :
 	m_hIOCP(UniqueHandle(NULL, CloseHandle)),
 	m_hShutdownEvent(UniqueHandle(NULL, CloseHandle)),

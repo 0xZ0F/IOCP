@@ -4,10 +4,6 @@
 #include "ServerLib/DebugPrint.h"
 #include "ServerLib/IOCP.hpp"
 
-#ifndef NDEBUG
-Logger::Logger _g_logger;
-#endif
-
 int main(int argc, char** argv)
 {
 	DEBUG_PRINT("Debug On\n");
