@@ -8,7 +8,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include "Logger/Logger.hpp"
+#include "../Logger/Logger.hpp"
 
 extern Logger::Logger _g_IOCPLog; // In IOCP.cpp
 #define __FILENAME__ (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
