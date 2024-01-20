@@ -33,13 +33,11 @@ namespace IOCP
 		using ProcessPacketCb_t = std::function<bool(IOCPContext& context)>;
 
 		using UniqueHandle = std::unique_ptr<void, decltype(&CloseHandle)>;
-		using UniqueWSAEvent = std::unique_ptr<void, decltype(&WSACloseEvent)>;
 
 	protected:
 		IOCPContextManager m_contextManager;
 
 		UniqueSocket m_hListenSocket;
-		UniqueWSAEvent m_hAcceptEvent;
 		UniqueHandle m_hShutdownEvent;
 		UniqueHandle m_hIOCP;
 		std::vector<std::thread> m_vThreads;
@@ -57,18 +55,20 @@ namespace IOCP
 		void operator=(const IOCP&) = delete;
 		void operator=(IOCP&&) = delete;
 
+		~IOCP();
+
 		/// <summary>
 		/// Begin accepting clients.
 		/// </summary>
 		/// <param name="usPort"></param>
 		/// <returns></returns>
-		bool Begin(unsigned short usPort);
+		bool Begin(USHORT usPort, UINT8 uInitialWorkerThreads = 3);
 
 	protected:
 		bool DefaultMoreDataCb(const std::string_view& recvd, size_t& amountLeft);
 		bool DefaultProcessPacketCb(IOCPContext& context);
 
-		bool CreateListeningSocket(unsigned short usPort);
+		bool CreateListeningSocket(USHORT usPort);
 		bool ScheduleAccept();
 		bool HandleNewConnection(SOCKET clientListenSock);
 		bool AssociateWithIOCP(const IOCPContext* pContext);
