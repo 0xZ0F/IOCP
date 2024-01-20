@@ -7,7 +7,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include "Logger.hpp"
+#include "Logger/Logger.hpp"
 
 #define __FILENAME__ (strrchr(__FILE__, '\\') ? strrchr(__FILE__, '\\') + 1 : __FILE__)
 //#define DEBUG_PRINT(format, ...) fprintf(stderr, "[DEBUG] %s:%d:%s(): ", __FILENAME__, __LINE__, __func__); fprintf (stderr, format, ##__VA_ARGS__)
