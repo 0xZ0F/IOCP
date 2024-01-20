@@ -141,9 +141,6 @@
     <None Include="cpp.hint" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Logger\Logger.vcxproj">
-      <Project>{890a00d6-cdfa-4968-b580-507897485cec}</Project>
-    </ProjectReference>
     <ProjectReference Include="..\ServerLib\ServerLib.vcxproj">
       <Project>{7c4bb324-61c1-4015-bbec-bdd88e31c353}</Project>
     </ProjectReference>

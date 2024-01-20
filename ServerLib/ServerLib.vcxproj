@@ -22,6 +22,7 @@
     <ClInclude Include="DebugPrint.h" />
     <ClInclude Include="IOCPContext.hpp" />
     <ClInclude Include="IOCPContextManager.hpp" />
+    <ClInclude Include="Logger.hpp" />
     <ClInclude Include="UniqueSocket.hpp" />
     <ClInclude Include="WSAOVERLAPPEDPLUS.h" />
   </ItemGroup>
@@ -30,12 +31,8 @@
     <ClCompile Include="IOCPContext.cpp" />
     <ClCompile Include="IOCPContextManager.cpp" />
     <ClCompile Include="IOCPDefaultCallbacks.cpp" />
+    <ClCompile Include="Logger.cpp" />
     <ClCompile Include="UniqueSocket.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Logger\Logger.vcxproj">
-      <Project>{890a00d6-cdfa-4968-b580-507897485cec}</Project>
-    </ProjectReference>
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>

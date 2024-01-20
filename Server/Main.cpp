@@ -1,13 +1,9 @@
 #include <iostream>
 
-#include "Logger/Logger.hpp"
-#include "ServerLib/DebugPrint.h"
 #include "ServerLib/IOCP.hpp"
 
 int main(int argc, char** argv)
 {
-	DEBUG_PRINT("Debug On\n");
-
 	if (argc != 2)
 	{
 		fprintf(stderr, "Usage: %s <PORT>\n", argv[0]);
@@ -19,7 +15,7 @@ int main(int argc, char** argv)
 	u_short usPort = atoi(argv[1]);
 	if (!iocp.Begin(usPort))
 	{
-		DEBUG_PRINT("iocp.Init() WSA_GLE: %d\n", WSAGetLastError());
+		fprintf(stderr, "iocp.Begin()\n");
 		return -1;
 	}
 
